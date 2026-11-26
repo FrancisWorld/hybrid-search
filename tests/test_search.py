@@ -258,6 +258,7 @@ def test_min_similarity_filters_weak_vector_hits(ix: Index) -> None:
         ({"k": 10, "offset": 95, "candidates": 100}, "cannot exceed"),
         ({"rrf_k": -1}, "rrf_k"),
         ({"query": "  "}, "empty"),
+        ({"query": "a" * 2049, "mode": "vector"}, "longer than"),
     ],
 )
 def test_request_validation(kwargs: dict[str, Any], fragment: str) -> None:

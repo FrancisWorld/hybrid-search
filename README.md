@@ -121,6 +121,7 @@ Engine: 5000 synthetic 60-word documents indexed in 26.6 s (188 docs/s, no fsync
 - **Global BM25 statistics** (N, df, avgdl) across segments so scores do not depend on segmentation (tested against a naive reference). df still counts tombstoned documents until a merge, as Lucene does.
 - **Per-field BM25 summed with boosts**, not true BM25F.
 - **Facets** count the lexical match set plus vector candidates, after filters.
+- **Durability details.** Every created, renamed or truncated file (WAL, segments, manifest, config) is followed by an fsync of its directory; tests spy on `os.fsync` for directory descriptors. Queries are capped at 2048 characters in every mode and request bodies at `HYBRID_SEARCH_MAX_BODY` bytes (413). The postings decoder rejects malformed blocks (duplicate ids, zero frequencies, trailing bytes) with `CodecError`.
 - **Single writer per directory** (`flock`), many reader threads. POSIX only.
 
 ## Testing strategy

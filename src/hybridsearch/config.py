@@ -23,6 +23,7 @@ class Settings:
     keyword_fields: tuple[str, ...] = ("category", "tags")
     number_fields: tuple[str, ...] = ("year",)
     embedding_dim: int = 256
+    max_body_bytes: int = 16 * 1024 * 1024
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -37,6 +38,7 @@ class Settings:
             ),
             number_fields=_csv(env.get("HYBRID_SEARCH_NUMBERS", ",".join(defaults.number_fields))),
             embedding_dim=int(env.get("HYBRID_SEARCH_DIM", str(defaults.embedding_dim))),
+            max_body_bytes=int(env.get("HYBRID_SEARCH_MAX_BODY", str(defaults.max_body_bytes))),
         )
 
     def schema(self) -> Schema:

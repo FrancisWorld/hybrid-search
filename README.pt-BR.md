@@ -92,6 +92,7 @@ Motor: 5000 documentos sintéticos de 60 palavras indexados em 26,6 s (188 docs/
 - **O memtable é um segmento de verdade**, reconstruído sob demanda: um só caminho de código para dados novos e antigos, ao custo de O(memtable) por busca após uma escrita.
 - **Estatísticas BM25 globais** entre segmentos: o score não depende de como os documentos foram divididos (testado contra uma implementação ingênua). O df ainda conta documentos apagados até o merge.
 - **BM25 por campo somado com boosts**, não BM25F de verdade.
+- **Durabilidade.** Todo arquivo criado, renomeado ou truncado (WAL, segmentos, manifesto, config) é seguido de fsync do diretório; os testes espionam `os.fsync`. Consultas limitadas a 2048 caracteres em todos os modos e corpo das requisições a `HYBRID_SEARCH_MAX_BODY` bytes (413). O decodificador de postings rejeita blocos malformados com `CodecError`.
 - **Um escritor por diretório** (`flock`), várias threads de leitura. Apenas POSIX.
 
 ## Estratégia de testes

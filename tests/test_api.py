@@ -164,3 +164,30 @@ def test_settings_from_env(tmp_path: Path) -> None:
     assert s.number_fields == ()
     assert s.schema().embedding_dim == 64
     assert Settings.from_env({}).fsync is True
+
+
+def test_oversized_query_is_rejected_in_every_mode(client: TestClient) -> None:
+    for mode in ("lexical", "vector", "hybrid"):
+        res = client.post("/search", json={"query": "a" * 2049, "mode": mode})
+        assert res.status_code == 422  # pydantic max_length on the wire model
+    assert client.post("/search", json={"query": "a" * 2048, "mode": "vector"}).status_code == 200
+
+
+def test_oversized_body_gets_413_by_header_and_while_streaming(settings: Settings) -> None:
+    small = Settings(
+        index_dir=settings.index_dir, fsync=False, embedding_dim=64, max_body_bytes=500
+    )
+    with TestClient(create_app(settings=small)) as c:
+        big = {"documents": [{"id": "x", "fields": {"body": "w " * 400}}]}
+        res = c.post("/documents", json=big)
+        assert res.status_code == 413
+        assert res.json()["error"]["code"] == "payload_too_large"
+
+        def chunks() -> Iterator[bytes]:  # no Content-Length: chunked upload
+            for _ in range(10):
+                yield b" " * 100
+
+        res = c.post("/documents", content=chunks(), headers={"content-type": "application/json"})
+        assert res.status_code == 413
+        assert c.post("/search", json={"query": "ok"}).status_code == 200
+        assert c.get("/healthz").json()["documents"] == 0

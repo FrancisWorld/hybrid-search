@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hybridsearch.config import Settings
 from hybridsearch.errors import (
@@ -23,6 +25,7 @@ from hybridsearch.errors import (
     ValidationError,
 )
 from hybridsearch.index import Index
+from hybridsearch.query import MAX_QUERY_CHARS
 from hybridsearch.search import Mode, SearchRequest, SearchResult, result_to_dict
 
 log = logging.getLogger("hybridsearch.api")
@@ -55,7 +58,7 @@ class BulkIn(BaseModel):
 class SearchIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    query: str
+    query: str = Field(max_length=MAX_QUERY_CHARS)
     mode: Mode = "hybrid"
     k: int = 10
     offset: int = 0
@@ -69,6 +72,73 @@ class SearchIn(BaseModel):
 
     def to_request(self) -> SearchRequest:
         return SearchRequest(**self.model_dump())
+
+
+class _BodyTooLargeError(Exception):
+    pass
+
+
+class BodyLimitMiddleware:
+    """Reject request bodies above ``max_bytes`` with 413, by header and while streaming."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        declared = dict(scope["headers"]).get(b"content-length", b"")
+        if declared.isdigit() and int(declared) > self.max_bytes:
+            await self._reject(send)
+            return
+        received = 0
+        exceeded = False
+        rejected = False
+
+        async def limited_receive() -> Message:
+            nonlocal received, exceeded
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    exceeded = True
+                    raise _BodyTooLargeError
+            return message
+
+        async def guarded_send(message: Message) -> None:
+            # Frameworks turn the receive() failure into their own 400; answer 413 instead.
+            nonlocal rejected
+            if not exceeded:
+                await send(message)
+            elif not rejected:
+                rejected = True
+                await self._reject(send)
+
+        try:
+            await self.app(scope, limited_receive, guarded_send)
+        except _BodyTooLargeError:
+            if not rejected:
+                await self._reject(send)
+
+    async def _reject(self, send: Send) -> None:
+        body = json.dumps(
+            {
+                "error": {
+                    "code": "payload_too_large",
+                    "message": f"body exceeds {self.max_bytes} bytes",
+                }
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [(b"content-type", b"application/json"), (b"connection", b"close")],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
 
 
 def create_app(index: Index | None = None, settings: Settings | None = None) -> FastAPI:
@@ -90,6 +160,7 @@ def create_app(index: Index | None = None, settings: Settings | None = None) -> 
                 log.info("index closed")
 
     app = FastAPI(title="hybrid-search", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
 
     @app.exception_handler(SearchError)
     async def search_error_handler(_: Request, exc: SearchError) -> JSONResponse:

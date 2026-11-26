@@ -23,7 +23,7 @@ from hybridsearch.highlight import (
     render_fragment,
     terms_only_targets,
 )
-from hybridsearch.query import analyze_query, parse_query, positive_text
+from hybridsearch.query import MAX_QUERY_CHARS, analyze_query, parse_query, positive_text
 from hybridsearch.schema import Schema
 from hybridsearch.searcher import Bm25Params, LexicalSearcher
 from hybridsearch.snapshot import Snapshot
@@ -63,6 +63,8 @@ class SearchRequest:
             raise ValidationError("rrf_k must be >= 0 and facet_size >= 1")
         if not self.query.strip():
             raise ValidationError("query must not be empty")
+        if len(self.query) > MAX_QUERY_CHARS:  # also covers vector mode, which never parses
+            raise ValidationError(f"query longer than {MAX_QUERY_CHARS} characters")
 
 
 @dataclass
