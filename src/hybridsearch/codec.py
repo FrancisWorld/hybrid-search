@@ -67,13 +67,20 @@ def decode_varints(buf: bytes | memoryview, count: int, pos: int = 0) -> tuple[l
     return out, pos
 
 
-def delta_encode(values: Sequence[int]) -> list[int]:
-    """Turn a non-decreasing sequence into gaps (first value is kept as is)."""
+def delta_encode(values: Sequence[int], *, strict: bool = False) -> list[int]:
+    """Turn a non-decreasing (or, with ``strict``, increasing) sequence into gaps.
+
+    The first value is kept as is.
+    """
     out: list[int] = []
     prev = 0
-    for value in values:
-        if value < prev:
-            raise ValueError("delta coding needs a non-decreasing sequence")
+    for index, value in enumerate(values):
+        if value < prev or (strict and index and value == prev):
+            raise ValueError(
+                "delta coding needs a strictly increasing sequence"
+                if strict
+                else "delta coding needs a non-decreasing sequence"
+            )
         out.append(value - prev)
         prev = value
     return out
@@ -107,11 +114,11 @@ def encode_postings(doc_ids: Sequence[int], positions: Sequence[Sequence[int]]) 
         raise ValueError("doc_ids and positions must be the same length")
     if any(not pos for pos in positions):
         raise ValueError("every posting needs at least one position")
-    doc_bytes = encode_varints(delta_encode(doc_ids))
+    doc_bytes = encode_varints(delta_encode(doc_ids, strict=True))
     tf_bytes = encode_varints(len(p) for p in positions)
     pos_bytes = bytearray()
     for plist in positions:
-        pos_bytes += encode_varints(delta_encode(plist))
+        pos_bytes += encode_varints(delta_encode(plist, strict=True))
     return b"".join(
         (
             encode_varint(len(doc_ids)),
@@ -125,23 +132,41 @@ def encode_postings(doc_ids: Sequence[int], positions: Sequence[Sequence[int]]) 
 
 
 def decode_postings(buf: bytes | memoryview, with_positions: bool = False) -> PostingsList:
+    """Decode and validate a postings block.
+
+    Rejects (with :class:`CodecError`) duplicate or non-increasing doc ids, zero
+    frequencies, duplicate or non-increasing positions, and trailing bytes.
+    """
     n_docs, pos = decode_varint(buf, 0)
     doc_len, pos = decode_varint(buf, pos)
     gaps, end = decode_varints(buf, n_docs, pos)
     if end - pos != doc_len:
         raise CodecError("doc id block length mismatch")
+    if any(gap == 0 for gap in gaps[1:]):
+        raise CodecError("doc ids must be strictly increasing")
     pos = end
     tf_len, pos = decode_varint(buf, pos)
     freqs, end = decode_varints(buf, n_docs, pos)
     if end - pos != tf_len:
         raise CodecError("frequency block length mismatch")
+    if any(tf == 0 for tf in freqs):
+        raise CodecError("term frequency must be at least 1")
     doc_ids = np.cumsum(np.asarray(gaps, dtype=np.int64))
     freq_arr = np.asarray(freqs, dtype=np.int64)
+    rest = np.frombuffer(buf, dtype=np.uint8, offset=end)
+    if (len(rest) and rest[-1] >= 0x80) or int(np.count_nonzero(rest < 0x80)) != int(
+        freq_arr.sum()
+    ):
+        raise CodecError("position block does not match the frequencies (or has trailing bytes)")
     positions: list[list[int]] | None = None
     if with_positions:
         positions = []
         pos = end
         for tf in freqs:
             plist, pos = decode_varints(buf, tf, pos)
+            if any(gap == 0 for gap in plist[1:]):
+                raise CodecError("positions must be strictly increasing")
             positions.append(delta_decode(plist))
+        if pos != len(buf):
+            raise CodecError("trailing bytes after the last position")
     return PostingsList(doc_ids, freq_arr, positions)

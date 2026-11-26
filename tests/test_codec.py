@@ -65,6 +65,9 @@ def test_delta_roundtrip(values: list[int]) -> None:
 def test_delta_rejects_decreasing() -> None:
     with pytest.raises(ValueError, match="non-decreasing"):
         delta_encode([3, 2])
+    with pytest.raises(ValueError, match="strictly increasing"):
+        delta_encode([3, 3], strict=True)
+    assert delta_encode([0, 0]) == [0, 0]
 
 
 @st.composite
@@ -107,3 +110,52 @@ def test_postings_validation_and_corruption() -> None:
     bad = bytes([blob[0], blob[1] + 1]) + blob[2:]
     with pytest.raises(CodecError, match="block length"):
         decode_postings(bad)
+
+
+def raw_block(gaps: list[int], freqs: list[int], positions: bytes, tail: bytes = b"") -> bytes:
+    doc_bytes, tf_bytes = encode_varints(gaps), encode_varints(freqs)
+    return (
+        encode_varint(len(gaps))
+        + encode_varint(len(doc_bytes))
+        + doc_bytes
+        + encode_varint(len(tf_bytes))
+        + tf_bytes
+        + positions
+        + tail
+    )
+
+
+@pytest.mark.parametrize("with_positions", [False, True])
+@pytest.mark.parametrize(
+    ("block", "fragment"),
+    [
+        (raw_block([3, 0], [1, 1], b"\x00\x00"), "doc ids must be strictly increasing"),
+        (raw_block([3, 2], [1, 0], b"\x00"), "frequency must be at least 1"),
+        (raw_block([3, 2], [1, 1], b"\x00\x00", b"\x07"), "does not match"),
+        (raw_block([3, 2], [1, 1], b"\x00\x00", b"\x80"), "does not match"),
+        (raw_block([3], [2], b"\x04\x00"), "positions must be strictly increasing"),
+        (raw_block([3], [2], b"\x04"), "does not match"),
+    ],
+)
+def test_malformed_blocks_are_rejected(block: bytes, fragment: str, with_positions: bool) -> None:
+    if with_positions or "positions must" not in fragment:
+        with pytest.raises(CodecError, match=fragment):
+            decode_postings(block, with_positions=with_positions)
+
+
+def test_encoder_rejects_duplicate_ids_and_positions() -> None:
+    with pytest.raises(ValueError, match="strictly increasing"):
+        encode_postings([1, 1], [[0], [0]])
+    with pytest.raises(ValueError, match="strictly increasing"):
+        encode_postings([1], [[2, 2]])
+
+
+@given(st.binary(max_size=64))
+def test_decoder_only_raises_codec_error_on_garbage(blob: bytes) -> None:
+    for with_positions in (False, True):
+        try:
+            result = decode_postings(blob, with_positions)
+        except CodecError:
+            continue
+        assert (result.freqs >= 1).all()
+        assert (result.doc_ids[1:] > result.doc_ids[:-1]).all()
