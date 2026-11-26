@@ -44,7 +44,8 @@ class Token:
 
 
 class Analyzer(Protocol):
-    name: str
+    @property
+    def name(self) -> str: ...
 
     def analyze(self, text: str) -> list[Token]: ...
 
