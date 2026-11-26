@@ -54,6 +54,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
 markers = ["slow: slower statistical tests (HNSW recall)"]
 
 [tool.coverage.run]

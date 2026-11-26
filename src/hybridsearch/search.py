@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 import numpy as np
@@ -85,6 +85,17 @@ class SearchResult:
     mode: Mode
     facets: dict[str, list[dict[str, Any]]]
     took_ms: float
+
+
+def result_to_dict(result: SearchResult) -> dict[str, Any]:
+    """JSON-ready form of a result (used by the API and the CLI)."""
+    return {
+        "mode": result.mode,
+        "total": result.total,
+        "took_ms": round(result.took_ms, 3),
+        "facets": result.facets,
+        "hits": [asdict(h) for h in result.hits],
+    }
 
 
 @dataclass

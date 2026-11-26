@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hybrid-search</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1b1f24; --bg:#fbfbfa; --muted:#5b6470; --line:#d9dcdf; --accent:#0b6e4f; --mark:#ffe58a; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6e8ea; --bg:#14171a; --muted:#9aa4af; --line:#2c3238; --accent:#4cc9a0; --mark:#6b5a12; } }
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+  main { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem; }
+  h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+  form { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+  input, select, button { font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; }
+  input[type=search] { flex: 1 1 16rem; }
+  button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+  .meta { color: var(--muted); font-size: .85rem; }
+  .hit { border-top: 1px solid var(--line); padding: .8rem 0; }
+  .hit h2 { font-size: 1.05rem; margin: 0; }
+  .hit p { margin: .25rem 0; }
+  .ranks { font-variant-numeric: tabular-nums; }
+  mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 .1em; }
+  .error { color: #b42318; }
+  .facets a { margin-right: .75rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>hybrid-search <span class="meta">{{ documents }} documents</span></h1>
+  <form method="get" action="/">
+    <input type="search" name="q" value="{{ q }}" placeholder='espresso machine, "exact phrase", +must -not, title:word' autofocus>
+    <select name="mode" aria-label="mode">
+      {% for m in ["hybrid", "lexical", "vector"] %}
+      <option value="{{ m }}" {% if m == mode %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    {% if facet_field %}<input type="text" name="category" value="{{ category }}" placeholder="{{ facet_field }} filter" size="14">{% endif %}
+    <button type="submit">Search</button>
+  </form>
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if result %}
+    <p class="meta">{{ result.total }} matches in {{ "%.1f"|format(result.took_ms) }} ms ({{ result.mode }})</p>
+    {% for field, buckets in result.facets.items() %}
+      <p class="facets meta">{{ field }}:
+        {% for b in buckets %}<a href="/?q={{ q|urlencode }}&mode={{ mode }}&category={{ b.value|urlencode }}">{{ b.value }} ({{ b.count }})</a>{% endfor %}
+      </p>
+    {% endfor %}
+    {% for hit in result.hits %}
+      <article class="hit">
+        <h2>{% if hit.highlights.get("title") %}{{ hit.highlights["title"]|safe }}{% else %}{{ hit.document.fields.get("title", hit.id) }}{% endif %}</h2>
+        <p>{{ hit.snippet|safe }}</p>
+        <p class="meta ranks">{{ hit.id }} · score {{ "%.4f"|format(hit.score) }}
+          {% if hit.lexical_rank %}· lexical #{{ hit.lexical_rank }}{% endif %}
+          {% if hit.vector_rank %}· vector #{{ hit.vector_rank }}{% endif %}</p>
+      </article>
+    {% else %}
+      <p class="meta">No results.</p>
+    {% endfor %}
+  {% endif %}
+</main>
+</body>
+</html>
