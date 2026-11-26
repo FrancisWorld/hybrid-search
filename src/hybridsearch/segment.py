@@ -68,22 +68,46 @@ class SegmentData:
         self.ids = [doc["id"] for doc in self.stored]
 
 
-def analyze_documents(
-    docs: Sequence[Document], vectors: FloatMatrix, schema: Schema, analyzer: Analyzer
+@dataclass(frozen=True)
+class AnalyzedDoc:
+    """One document after analysis: cheap to keep in the memtable and to assemble later."""
+
+    stored: dict[str, Any]
+    lengths: dict[str, int]
+    terms: dict[tuple[str, str], list[int]]
+
+
+def analyze_document(doc: Document, schema: Schema, analyzer: Analyzer) -> AnalyzedDoc:
+    lengths: dict[str, int] = {}
+    terms: dict[tuple[str, str], list[int]] = {}
+    for name in schema.text_fields:
+        tokens = analyzer.analyze(doc.fields.get(name, ""))
+        lengths[name] = len(tokens)
+        for tok in tokens:
+            terms.setdefault((name, tok.term), []).append(tok.position)
+    return AnalyzedDoc(doc.to_dict(), lengths, terms)
+
+
+def assemble_segment_data(
+    docs: Sequence[AnalyzedDoc], vectors: FloatMatrix, schema: Schema
 ) -> SegmentData:
-    """Run the analyzer over documents and collect postings (local doc id = list index)."""
+    """Collect analysed documents into postings (local doc id = list index)."""
     lengths: dict[str, list[int]] = {name: [] for name in schema.text_fields}
     postings: dict[tuple[str, str], list[tuple[int, list[int]]]] = {}
     for local, doc in enumerate(docs):
         for name in schema.text_fields:
-            tokens = analyzer.analyze(doc.fields.get(name, ""))
-            lengths[name].append(len(tokens))
-            per_term: dict[str, list[int]] = {}
-            for tok in tokens:
-                per_term.setdefault(tok.term, []).append(tok.position)
-            for term, positions in per_term.items():
-                postings.setdefault((name, term), []).append((local, positions))
-    return SegmentData([d.to_dict() for d in docs], lengths, postings, vectors)
+            lengths[name].append(doc.lengths[name])
+        for key, positions in doc.terms.items():
+            postings.setdefault(key, []).append((local, positions))
+    return SegmentData([d.stored for d in docs], lengths, postings, vectors)
+
+
+def analyze_documents(
+    docs: Sequence[Document], vectors: FloatMatrix, schema: Schema, analyzer: Analyzer
+) -> SegmentData:
+    return assemble_segment_data(
+        [analyze_document(d, schema, analyzer) for d in docs], vectors, schema
+    )
 
 
 def _columns(

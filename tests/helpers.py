@@ -8,6 +8,7 @@ from hybridsearch.analysis import LanguageAnalyzer
 from hybridsearch.embedder import HashingEmbedder
 from hybridsearch.schema import Document, Schema, parse_document
 from hybridsearch.segment import Segment, SegmentOptions, analyze_documents, serialize_segment
+from hybridsearch.snapshot import SegmentView, Snapshot
 
 VOCAB = (
     "espresso machine pressure grinder bean roast kettle pour filter water boiler steam "
@@ -45,3 +46,17 @@ def build_segment(
 ) -> Segment:
     data = analyze_documents(docs, embedder.embed([d.text for d in docs]), schema, analyzer)
     return Segment(serialize_segment(data, schema, options or SegmentOptions()))
+
+
+def make_snapshot(
+    groups: list[list[Document]],
+    schema: Schema,
+    analyzer: LanguageAnalyzer,
+    embedder: HashingEmbedder,
+    deleted: dict[int, list[int]] | None = None,
+) -> Snapshot:
+    views = [
+        SegmentView.of(build_segment(docs, schema, analyzer, embedder), (deleted or {}).get(i, ()))
+        for i, docs in enumerate(groups)
+    ]
+    return Snapshot(tuple(views))
