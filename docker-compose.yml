@@ -1,0 +1,16 @@
+services:
+  search:
+    build: .
+    image: hybrid-search:local
+    ports:
+      - "127.0.0.1:${HYBRID_SEARCH_PORT:-8000}:8000"
+    environment:
+      HYBRID_SEARCH_DIR: /data/index
+      HYBRID_SEARCH_LANGUAGE: en
+    volumes:
+      - index-data:/data
+    stop_grace_period: 20s # lets the app flush the memtable on SIGTERM
+    restart: unless-stopped
+
+volumes:
+  index-data:
