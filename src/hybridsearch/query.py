@@ -258,3 +258,12 @@ def analyze_query(node: Node, analyzer: Analyzer) -> Node | None:
 def _prune(nodes: tuple[Node, ...], analyzer: Analyzer) -> tuple[Node, ...]:
     out = (analyze_query(n, analyzer) for n in nodes)
     return tuple(n for n in out if n is not None)
+
+
+def positive_text(node: Node) -> str:
+    """Words the user asked for (prohibited clauses removed): the vector side of hybrid search."""
+    if isinstance(node, Text):
+        return node.text
+    if isinstance(node, Bool):
+        return " ".join(positive_text(n) for n in (*node.must, *node.should))
+    return ""
