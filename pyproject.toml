@@ -39,7 +39,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF", "PL", "PT"]
-ignore = ["SIM905", "PLR2004", "PLR0913", "PLR0912", "PLR0915", "RUF001", "RUF002", "RUF003"]
+ignore = ["SIM905", "PLR2004", "PLR0913", "PLR0917", "PLR0912", "PLR0915", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 strict = true
