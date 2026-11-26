@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import threading
 from pathlib import Path
 from typing import Any
@@ -24,7 +26,7 @@ from hybridsearch.schema import Schema
 from hybridsearch.search import Mode, SearchRequest
 from hybridsearch.segment import SegmentOptions
 from hybridsearch.wal import WriteAheadLog
-from tests.helpers import VOCAB
+from tests.helpers import VOCAB, dir_of
 
 SMALL = IndexOptions(
     fsync=False,
@@ -444,3 +446,26 @@ def test_concurrent_writers_readers_flush_and_merge(tmp_path: Path, schema: Sche
     ix.close()
     with Index.open(tmp_path / "ix", options=SMALL) as again:
         assert again.count() == len(expected)
+
+
+def test_every_durable_file_change_fsyncs_its_directory(
+    tmp_path: Path, schema: Schema, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    synced: list[str] = []
+    real = os.fsync
+
+    def spy(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            synced.append(os.path.realpath(dir_of(fd)))
+        real(fd)
+
+    monkeypatch.setattr(os, "fsync", spy)
+    root = os.path.realpath(tmp_path / "ix")
+    with Index.open(tmp_path / "ix", schema, options=SMALL) as ix:
+        assert synced.count(root) >= 2  # index.json and wal.log creation
+        synced.clear()
+        ix.put_many([doc(i) for i in range(3)])
+        ix.flush()
+        # new segment file -> segments/, manifest rename -> root, WAL reset -> root
+        assert os.path.join(root, "segments") in synced
+        assert synced.count(root) >= 2

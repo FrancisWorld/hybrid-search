@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from hybridsearch.wal import (
     encode_record,
     parse_records,
 )
+from tests.helpers import dir_of
 
 
 def make_records(n: int, start: int = 1) -> list[WalRecord]:
@@ -124,3 +127,33 @@ def test_reset_discards_records_and_guards(tmp_path: Path) -> None:
     wal.close()
     records, _ = WriteAheadLog(path).recover()
     assert [r.seq for r in records] == [4]
+
+
+def _spy_dir_fsyncs(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record the path of every directory whose file descriptor is fsynced."""
+    synced: list[str] = []
+    real = os.fsync
+
+    def spy(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            synced.append(dir_of(fd))
+        real(fd)
+
+    monkeypatch.setattr(os, "fsync", spy)
+    return synced
+
+
+def test_creating_and_resetting_the_wal_fsyncs_the_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    synced = _spy_dir_fsyncs(monkeypatch)
+    wal = WriteAheadLog(tmp_path / "wal.log")
+    wal.recover()
+    assert [os.path.realpath(p) for p in synced] == [os.path.realpath(tmp_path)]
+    wal.append(make_records(2))
+    wal.reset()
+    assert len(synced) == 2
+    wal.close()
+    synced.clear()
+    WriteAheadLog(tmp_path / "wal.log").recover()  # existing, valid log: nothing to create
+    assert synced == []

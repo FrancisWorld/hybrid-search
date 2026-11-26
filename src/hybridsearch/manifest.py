@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from hybridsearch.errors import CorruptIndexError
-from hybridsearch.segment import fsync_dir
+from hybridsearch.fsutil import fsync_dir
 
 FORMAT_VERSION = 1
 

@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from hybridsearch.fsutil import fsync_dir
+
 MAGIC = b"HSWAL001"
 _FRAME = struct.Struct("<II")
 _HEAD = struct.Struct("<QB")
@@ -114,8 +116,11 @@ class WriteAheadLog:
         records, valid = parse_records(blob)
         dropped = len(blob) - valid if blob else 0
         if valid == 0:
-            self.path.write_bytes(MAGIC)
-            self._sync_path()
+            with self.path.open("wb") as out:
+                out.write(MAGIC)
+                out.flush()
+                os.fsync(out.fileno())
+            fsync_dir(self.path.parent)  # the new directory entry must survive power loss too
             dropped = len(blob) - len(MAGIC) if len(blob) > len(MAGIC) else 0
         elif dropped:
             with self.path.open("r+b") as fh:
@@ -143,6 +148,7 @@ class WriteAheadLog:
             out.write(MAGIC)
             out.flush()
             os.fsync(out.fileno())
+        fsync_dir(self.path.parent)
         self._fh = self.path.open("ab")
 
     def close(self) -> None:
@@ -154,10 +160,3 @@ class WriteAheadLog:
         if self._fh is None:
             raise WalError("log is not open")
         return self._fh
-
-    def _sync_path(self) -> None:
-        fd = os.open(self.path, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)

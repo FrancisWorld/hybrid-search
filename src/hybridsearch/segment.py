@@ -38,6 +38,7 @@ from hybridsearch.codec import (
     encode_varint,
 )
 from hybridsearch.errors import CorruptIndexError
+from hybridsearch.fsutil import fsync_dir
 from hybridsearch.hnsw import BoolMask, HNSWIndex, brute_force
 from hybridsearch.schema import Document, Schema
 from hybridsearch.segment_format import pack_sections, unpack_sections
@@ -189,14 +190,6 @@ def write_segment_file(path: Path, blob: bytes) -> None:
         os.fsync(fh.fileno())
     tmp.replace(path)
     fsync_dir(path.parent)
-
-
-def fsync_dir(directory: Path) -> None:
-    fd = os.open(directory, os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
 
 
 class Segment:

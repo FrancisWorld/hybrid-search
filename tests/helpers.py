@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import fcntl
+import os
 import random
+import sys
 
 from hybridsearch.analysis import LanguageAnalyzer
 from hybridsearch.embedder import HashingEmbedder
@@ -60,3 +63,10 @@ def make_snapshot(
         for i, docs in enumerate(groups)
     ]
     return Snapshot(tuple(views))
+
+
+def dir_of(fd: int) -> str:
+    """Path of an open directory descriptor (Linux and macOS)."""
+    if sys.platform == "linux":
+        return os.readlink(f"/proc/self/fd/{fd}")
+    return os.fsdecode(fcntl.fcntl(fd, fcntl.F_GETPATH, b"\0" * 1024).split(b"\0")[0])

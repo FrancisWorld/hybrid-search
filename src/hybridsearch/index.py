@@ -40,6 +40,7 @@ from hybridsearch.errors import (
     IndexLockedError,
     ValidationError,
 )
+from hybridsearch.fsutil import fsync_dir
 from hybridsearch.manifest import Manifest, SegmentEntry, read_manifest, write_manifest
 from hybridsearch.merge import MergePolicy, merge_segments
 from hybridsearch.schema import Document, Schema, parse_document
@@ -82,14 +83,6 @@ class IndexOptions:
 class _MemDoc:
     analyzed: AnalyzedDoc
     vector: Any  # float32 row
-
-
-def _fsync_dir(path: Path) -> None:
-    fd = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
 
 
 class Index:
@@ -180,7 +173,7 @@ class Index:
         tmp = config.with_suffix(".tmp")
         tmp.write_text(json.dumps({"format": 1, "schema": schema.to_dict()}, indent=2))
         tmp.replace(config)
-        _fsync_dir(root)
+        fsync_dir(root)
         return schema
 
     def _recover(self) -> None:
