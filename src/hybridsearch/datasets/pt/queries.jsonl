@@ -1,0 +1,12 @@
+{"id": "q1", "query": "como fazer feijoada", "relevance": {"culinaria-feijoada": 2}}
+{"id": "q2", "query": "receita com queijo e polvilho", "relevance": {"culinaria-pao-de-queijo": 2, "culinaria-tapioca": 1}}
+{"id": "q3", "query": "doce com leite condensado e chocolate", "relevance": {"culinaria-brigadeiro": 2}}
+{"id": "q4", "query": "quando acontece um eclipse do sol", "relevance": {"astronomia-eclipse": 2}}
+{"id": "q5", "query": "observar estrelas com telescopio", "relevance": {"astronomia-telescopio": 2, "astronomia-estrelas": 1}}
+{"id": "q6", "query": "galaxia espiral", "relevance": {"astronomia-via-lactea": 2}}
+{"id": "q7", "query": "florestas queimadas e desmatadas", "relevance": {"amazonia-desmatamento": 2, "amazonia-biodiversidade": 1}}
+{"id": "q8", "query": "animais da amazonia", "relevance": {"amazonia-biodiversidade": 2, "amazonia-boto": 2}}
+{"id": "q9", "query": "transporte coletivo rapido nas cidades", "relevance": {"mobilidade-onibus": 2, "mobilidade-metro": 2, "mobilidade-aplicativos": 1}}
+{"id": "q10", "query": "pedalar ao trabalho", "relevance": {"mobilidade-bicicleta": 2}}
+{"id": "q11", "query": "musica com sanfona e zabumba", "relevance": {"musica-forro": 2}}
+{"id": "q12", "query": "ritmos brasileiros com violao", "relevance": {"musica-bossa-nova": 2, "musica-choro": 2, "musica-samba": 1}}

@@ -1,0 +1,14 @@
+{"id": "q1", "query": "make espresso at home", "relevance": {"coffee-espresso-machine": 2, "coffee-grinder": 1, "coffee-moka": 1}}
+{"id": "q2", "query": "grinding coffee beans evenly", "relevance": {"coffee-grinder": 2}}
+{"id": "q3", "query": "lava flows and eruptions", "relevance": {"volcano-eruption": 2, "volcano-lava": 2, "volcano-ash": 1}}
+{"id": "q4", "query": "preparing for a marathon", "relevance": {"running-marathon-plan": 2, "running-taper": 2, "running-pacing": 1}}
+{"id": "q5", "query": "avoid running injuries", "relevance": {"running-injuries": 2, "running-shoes": 1}}
+{"id": "q6", "query": "storing solar energy in batteries", "relevance": {"solar-battery": 2, "solar-inverter": 1, "solar-grid": 1}}
+{"id": "q7", "query": "sourdough starter feeding", "relevance": {"bread-starter": 2, "bread-hydration": 1}}
+{"id": "q8", "query": "why does bread crust get crisp", "relevance": {"bread-crust": 2, "bread-oven-spring": 1}}
+{"id": "q9", "query": "write ahead log durability", "relevance": {"databases-wal": 2, "databases-transactions": 1}}
+{"id": "q10", "query": "speed up queries with an index", "relevance": {"databases-indexes": 2, "databases-caching": 1}}
+{"id": "q11", "query": "volcanic soil for growing coffee", "relevance": {"mixed-volcanic-coffee": 2, "coffee-roast": 1, "volcano-eruption": 1}}
+{"id": "q12", "query": "espreso machin presure", "relevance": {"coffee-espresso-machine": 2}}
+{"id": "q13", "query": "runners hydration", "relevance": {"running-hydration": 2, "running-marathon-plan": 1}}
+{"id": "q14", "query": "baking with sunlight", "relevance": {"mixed-baking-solar": 2, "solar-panels": 1, "bread-crust": 1}}
